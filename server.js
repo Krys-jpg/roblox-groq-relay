@@ -24,7 +24,7 @@ app.post("/chat", async (req, res) => {
         },
       ],
       model: "llama-3.3-70b-versatile",
-      max_tokens: 35, // Physically prevents the AI from generating more than ~15 words
+      max_tokens: 150, // Physically prevents the AI from generating more than ~15 words
     });
 
     const reply = completion.choices[0]?.message?.content || "...";

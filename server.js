@@ -4,7 +4,7 @@ const Groq = require("groq-sdk");
 const app = express();
 app.use(express.json());
 
-// Initialize Groq API client (Set GROQ_API_KEY in Render's Environment Variables)
+// Initialize Groq API client (Uses GROQ_API_KEY from Render Environment Variables)
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 app.post("/chat", async (req, res) => {
@@ -24,12 +24,13 @@ app.post("/chat", async (req, res) => {
         },
       ],
       model: "llama-3.3-70b-versatile",
+      max_tokens: 35, // Physically prevents the AI from generating more than ~15 words
     });
 
     const reply = completion.choices[0]?.message?.content || "...";
     
-    // Return response back to Roblox
-    res.json({ response: reply });
+    // Returns both 'response' and 'reply' keys so Roblox reads it correctly
+    res.json({ response: reply, reply: reply });
   } catch (error) {
     console.error("Error handling request:", error);
     res.status(500).json({ error: "Internal Server Error" });

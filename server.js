@@ -1,29 +1,43 @@
-// Store affinity data in memory (Note: This resets if the server restarts. Consider a database later.)
-const AffinityData = {}; 
+const express = require("express");
+const Groq = require("groq-sdk");
 
-function getPersonalityDirective(affinity) {
-    if (affinity >= 61) {
-        return "Personality: You like the player now, though you tease them playfully. Be warm, supportive, and protective, but keep a hint of your original spark.";
-    } else if (affinity >= 26) {
-        return "Personality: You are starting to like the player, but you hate admitting it. Act flustered or grudgingly helpful, softening your usual mean comments.";
-    } else if (affinity >= 0) {
-        return "Personality: Sassy, sarcastic, and unimpressed. You don't trust the player yet and maintain a cold, guarded exterior.";
-    } else {
-        return "Personality: Annoyed and hostile. Openly dismissive of the player.";
-    }
-}
+const app = express();
+app.use(express.json());
 
-// Example endpoint/function to handle the incoming request from Roblox
-function processPlayerMessage(userId, playerText) {
-    // Initialize to 0 if the player doesn't exist in the object yet
-    if (AffinityData[userId] === undefined) {
-        AffinityData[userId] = 0;
+// Initialize Groq API client (Set GROQ_API_KEY in Render's Environment Variables)
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+
+app.post("/chat", async (req, res) => {
+  try {
+    const { prompt } = req.body;
+
+    if (!prompt) {
+      return res.status(400).json({ error: "Missing prompt in request body" });
     }
+
+    // Request completion from Groq
+    const completion = await groq.chat.completions.create({
+      messages: [
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+      model: "llama-3.3-70b-versatile",
+    });
+
+    const reply = completion.choices[0]?.message?.content || "...";
     
-    // 1. Construct dynamic system prompt
-    const personalityContext = getPersonalityDirective(AffinityData[userId]);
-    const fullPrompt = `${personalityContext}\nPlayer says: ${playerText}`;
-    
-    // 2. Pass fullPrompt to your AI API (Groq) here...
-    return fullPrompt;
-}
+    // Return response back to Roblox
+    res.json({ response: reply });
+  } catch (error) {
+    console.error("Error handling request:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+// Render assigns dynamic ports via process.env.PORT
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});

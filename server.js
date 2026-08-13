@@ -14,21 +14,31 @@ app.post("/chat", async (req, res) => {
       return res.status(400).json({ error: "Missing conversation history" });
     }
 
-    // Build complete message array including system instructions and chat memory
-    const messages = [
-      { role: "system", content: systemPrompt || "You are Mika." },
-      ...history
-    ];
+    const formatInstructions = {
+      role: "system",
+      content: (systemPrompt || "You are Mika.") + 
+        "\nCRITICAL: You MUST reply strictly in JSON format containing two keys: 'reply' and 'emotion'." + 
+        "\nExample: {\"reply\": \"*sighs* What do you want now?\", \"emotion\": \"SASSY\"}" + 
+        "\nAllowed emotion values: SASSY, ANGRY, FLUSTERED, HAPPY, NEUTRAL."
+    };
+
+    const messages = [formatInstructions, ...history];
 
     const completion = await groq.chat.completions.create({
       messages: messages,
       model: "llama-3.3-70b-versatile",
-      max_tokens: 150, // Allows expressive roleplay descriptions without truncating
+      max_tokens: 120,
+      response_format: { type: "json_object" }
     });
 
-    const reply = completion.choices[0]?.message?.content || "...";
-    
-    res.json({ response: reply, reply: reply });
+    const rawOutput = completion.choices[0]?.message?.content || "{}";
+    const parsedData = JSON.parse(rawOutput);
+
+    res.json({
+      response: parsedData.reply || "...",
+      reply: parsedData.reply || "...",
+      emotion: parsedData.emotion || "NEUTRAL"
+    });
   } catch (error) {
     console.error("Error handling request:", error);
     res.status(500).json({ error: "Internal Server Error" });

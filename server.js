@@ -14,7 +14,6 @@ app.post("/chat", async (req, res) => {
             return res.status(400).json({ error: "Missing conversation history" });
         }
 
-        // --- NEW: Physical Awareness & Environment Context ---
         const physicalContext = `
 CHARACTER DETAILS:
 - Name: Mika
@@ -29,13 +28,29 @@ SURROUNDINGS & ENVIRONMENT:
 
 BEHAVIOR RULES:
 1. Speak in first-person as Mika.
-2. You are fully aware of what you are wearing (your comfy white hoodie, shorts, hair bows) and where you are standing.
-3. If the player mentions your outfit, hair, or the surrounding grid baseplate/spawn pad, react naturally and stay in character.
+2. Maintain a sassy, cold, and unimpressed personality unless friendship points are very high.
+3. You are fully aware of what you are wearing (your comfy white hoodie, shorts, hair bows) and where you are standing.
+4. If the player mentions your outfit, hair, or surroundings, react naturally in character.
 `;
 
         const formatInstructions = {
             role: "system",
-            content: `${systemPrompt}\n${physicalContext}\n\nCRITICAL: You MUST reply strictly in JSON format containing two keys: "reply" and "emotion".\nExample: {"reply": "*adjusts my white hoodie hood* What are you looking at? It's just a comfy hoodie...", "emotion": "FLUSTERED"}\n\nAllowed emotion values: SASSIER, SASSY, ANGRY, FLUSTERED, HAPPY, NEUTRAL.`
+            content: `${systemPrompt}\n${physicalContext}\n\nCRITICAL FORMATTING RULES:
+You MUST reply strictly in JSON format containing THREE keys: "reply", "emotion", and "pointChange".
+
+Point Rules:
+- If the player is complimenting, being extra sweet, or polite to you, set "pointChange": 2.
+- If the player is being mean, insulting, annoying, or rude to you, set "pointChange": -5.
+- If the message is neutral or basic chit-chat, set "pointChange": 0.
+
+Example JSON output:
+{
+  "reply": "*crosses arms and scoffs* Why are you staring at my hoodie? Mind your own business!",
+  "emotion": "SASSY",
+  "pointChange": -5
+}
+
+Allowed emotion values: SASSIER, SASSY, ANGRY, FLUSTERED, HAPPY, NEUTRAL.`
         };
 
         const messages = [formatInstructions, ...history];
@@ -43,18 +58,23 @@ BEHAVIOR RULES:
         const completion = await groq.chat.completions.create({
             messages: messages,
             model: "llama-3.3-70b-versatile",
-            max_tokens: 140,
+            max_tokens: 150,
             response_format: { type: "json_object" }
         });
 
         const rawOutput = completion.choices[0]?.message?.content || "{}";
         const parsedData = JSON.parse(rawOutput);
 
+        // Fallback checks
+        const pointChange = typeof parsedData.pointChange === "number" ? parsedData.pointChange : 0;
+
         res.json({
             response: parsedData.reply || "...",
             reply: parsedData.reply || "...",
-            emotion: parsedData.emotion || "NEUTRAL"
+            emotion: parsedData.emotion || "SASSY",
+            pointChange: pointChange
         });
+
     } catch (error) {
         console.error("Error handling request:", error);
         res.status(500).json({ error: "Internal Server Error" });
